@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <!-- 适配移动端 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Three.js 3D产品展示</title>
+    <style>
+        /* 全屏展示，消除边距 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            overflow: hidden;
+            background-color: #f5f5f5;
+        }
+        /* 3D容器占满屏幕 */
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        /* 加载提示 */
+        #loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 18px;
+            color: #333;
+            font-family: Arial, sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <!-- 加载提示 -->
+    <div id="loading">正在加载3D模型...</div>
+    <!-- 3D渲染容器 -->
+    <div id="canvas-container"></div>
+
+    <!-- 引入Three.js核心库 -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
+    <!-- 引入鼠标控制器（旋转/缩放） -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- 引入GLB模型加载器 -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/examples/js/loaders/GLTFLoader.js"></script>
+
+    <script>
+        // 1. 初始化核心对象（场景、相机、渲染器）
+        const scene = new THREE.Scene(); // 3D场景（容器）
+        // 透视相机（模拟人眼视角）
+        const camera = new THREE.PerspectiveCamera(
+            75, // 视角
+            window.innerWidth / window.innerHeight, // 宽高比
+            0.1, // 最近可见距离
+            1000 // 最远可见距离
+        );
+        // 渲染器（负责画3D画面）
+        const renderer = new THREE.WebGLRenderer({
+            antialias: true, // 抗锯齿（更清晰）
+            alpha: true // 透明背景
+        });
+        renderer.setSize(window.innerWidth, window.innerHeight); // 适配窗口大小
+        renderer.shadowMap.enabled = true; // 开启阴影（增强质感）
+        // 将渲染器的画布添加到页面容器
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        // 2. 添加灯光（关键！没有灯光模型会黑）
+        // 主光源（模拟太阳光）
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        directionalLight.position.set(5, 5, 5); // 灯光位置
+        directionalLight.castShadow = true; // 开启阴影
+        scene.add(directionalLight);
+        // 环境光（补光，避免模型局部过暗）
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+
+        // 3. 添加鼠标控制器（旋转/缩放）
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true; // 阻尼（旋转更丝滑）
+        controls.dampingFactor = 0.05; // 阻尼系数
+        controls.enableZoom = true; // 允许缩放
+        controls.enablePan = true; // 允许平移
+        controls.maxDistance = 10; // 最大缩放距离
+        controls.minDistance = 1; // 最小缩放距离
+
+        // 4. 加载GLB模型（核心步骤）
+        const loader = new THREE.GLTFLoader();
+        // 替换成你的GLB模型链接（必须是HTTPS）
+        const modelUrl = "https://raw.githubusercontent.com/h17327413919-prog/3d-model-host/main/30tc.glb";
+        
+        loader.load(
+            // 模型链接
+            modelUrl,
+            // 加载成功回调
+            (gltf) => {
+                const model = gltf.scene;
+                // 模型居中（自动计算中心位置）
+                const box = new THREE.Box3().setFromObject(model);
+                const center = box.getCenter(new THREE.Vector3());
+                model.position.sub(center); // 模型移到原点
+                // 模型缩放（适配屏幕，根据模型大小调整）
+                const size = box.getSize(new THREE.Vector3()).length();
+                const scale = 2 / size; // 统一缩放比例
+                model.scale.setScalar(scale);
+                
+                scene.add(model); // 将模型添加到场景
+                document.getElementById('loading').style.display = 'none'; // 隐藏加载提示
+            },
+            // 加载进度回调（可选）
+            (xhr) => {
+                const progress = (xhr.loaded / xhr.total) * 100;
+                document.getElementById('loading').innerText = `加载中：${progress.toFixed(0)}%`;
+            },
+            // 加载失败回调
+            (error) => {
+                document.getElementById('loading').innerText = `加载失败：${error.message}`;
+                console.error('模型加载失败：', error);
+            }
+        );
+
+        // 5. 设置相机位置（能看到模型）
+        camera.position.z = 3;
+
+        // 6. 动画循环（让3D场景动起来）
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update(); // 更新控制器
+            renderer.render(scene, camera); // 渲染场景
+        }
+        animate();
+
+        // 7. 窗口大小自适应（调整窗口时自动适配）
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix(); // 更新相机参数
+            renderer.setSize(window.innerWidth, window.innerHeight); // 更新渲染器大小
+        });
+    </script>
+</body>
+</html>
